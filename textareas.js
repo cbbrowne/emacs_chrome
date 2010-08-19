@@ -17,30 +17,30 @@ var pageTextAreas = [];
 var findingTextAreas = false;
 
 // via options
+var enable_button = true;
 var enable_dblclick = false;
 var enable_keys = false;
 
 /*
-TODO: Do we still need this?
+  getTitle
 
-The Google Groups bug wasn't events getting deleted but areas being cloned and
-loosing their events that way.
+  Get the title from the DOM, if that fails try to synthesise something sensible
 */
-function updateEvent(thing, event, listener)
+
+function getTitle()
 {
-    // First remove the event so we don't stack up multiple ones
-    try {
-	thing && thing.removeEventListener(event, listener);
-    } catch (err) {
-	console.log ("event listener not registered for "+thing + "/"+event);
+    var title = document.title;
+    if (title == null || title.length==0) {
+	try {
+	    title = document.getElementsByTagName('title').item().innerText;
+	} catch (err) {
+	    console.log ("failed to extract title from HTML ("+err+")");
+	    title = document.documentURI;
+	}
     }
-    
-    // And the update again
-    if (thing) {
-	thing.addEventListener(event, listener, false);
-    }
+    return title;
 }
- 
+
 /*
   textAreaTracker
 
@@ -72,23 +72,18 @@ function textAreaTracker(text)
 	this.text.addEventListener('keydown', this.keydownListener);
 
     // The img 
-    this.image = document.createElement('img');
-    this.image.style.cursor='pointer';
-    this.image.setAttribute("edit_id", this.edit_id);
-    this.image.src = editImgURL;
+    if (enable_button) {
+	this.image = document.createElement('img');
+	this.image.style.cursor='pointer';
+	this.image.setAttribute("edit_id", this.edit_id);
+	this.image.src = editImgURL;
 
-    this.clickListener = editTextArea;
-    this.image.addEventListener('click', this.clickListener, false);
+	this.clickListener = editTextArea;
+	this.image.addEventListener('click', this.clickListener, false);
 
-    this.text.parentNode.insertBefore(this.image, text.nextSibling);
-
-    // The update function removes and re-adds events
-    this.updateEvents = function()
-    {
-	updateEvent(this.text, 'focus', this.focusListener);
-	updateEvent(this.text, 'dblclick', this.dblclickListener);
-	updateEvent(this.image, 'click', this.clickListener);
+	this.text.parentNode.insertBefore(this.image, text.nextSibling);
     }
+
 }
 
 /*
@@ -175,6 +170,11 @@ function updateTextArea(id, content) {
     var tracker = getTextAreaTracker(id);
     if (tracker) {
 	tracker.text.value = content;
+	orig = $(tracker.text).css('background-color');
+	$(tracker.text).css({'background-color': 'yellow'});
+	setTimeout(function(){
+	 	$(tracker.text).animate({ 'background-color': orig }, 1000);
+	    }, 1000);
     }
 }
 
@@ -191,6 +191,7 @@ function sendTextArea(text) {
     var edit_msg = {
 	msg: "edit",
 	text: text.value,
+	title: getTitle(),
 	id: text_edit_id
     };
     port.postMessage(edit_msg);
@@ -206,12 +207,22 @@ function sendTextArea(text) {
 	 if (focusedEdit) {
 	     sendTextArea(focusedEdit);
 	 } else {
-	     port.postMessage( {msg: "error", text: "No textarea in focus"} );
+	     var msg_text = "No textarea in focus in: "+getTitle();
+	     port.postMessage( {msg: "error", text: msg_text} );
 	 }
      };
 
      setFocused = function(){
-	 focusedEdit = this;		
+	 focusedEdit = this;
+	 // Update UI?
+	 var id = this.getAttribute("edit_id");
+	 if (id != undefined) {
+	     port.postMessage( {msg: "focus", id: id} );
+	     this.addEventListener('blur',  function() {
+		     port.postMessage( {msg: "focus", id: null} );
+		     this.removeEventListener('blur',arguments.callee,false);
+		 });
+	 }
      };
  })();
 
@@ -293,6 +304,7 @@ function localMessageHandler(msg, port) {
     var cmd = msg.msg;
     if (cmd == "config") {
 	console.log("config response: "+msg);
+	enable_button = msg.enable_button;
 	enable_dblclick = msg.enable_dblclick;
 	enable_keys = msg.enable_keys;
 	findTextAreas();

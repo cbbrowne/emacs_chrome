@@ -24,19 +24,25 @@ function getEditUrl()
 /*
  * Give some feedback to the user via the icon/hover text.
  */
-function updateUserFeedback(string, redIcon)
+function updateUserFeedback(string, colour)
 {
     console.log("updateUserFeedback: "+string);
     chrome.browserAction.setTitle({title:string});
-    if (redIcon) {
+    if (colour == null) {
+    	chrome.browserAction.setIcon({path:"emacs23-16x16.png"});
+    } else if (colour == "green") {
+	chrome.browserAction.setIcon({path:"emacs23-16x16-green.png"});
+    } else if (colour == "red") {
 	chrome.browserAction.setIcon({path:"emacs23-16x16-red.png"});
+    } else if (colour == "darkblue") {
+	chrome.browserAction.setIcon({path:"emacs23-16x16-darker.png"});
     } else {
     	chrome.browserAction.setIcon({path:"emacs23-16x16.png"});
     }
 }
     
 // Initial message
-updateUserFeedback("Awaiting edit request", false);
+updateUserFeedback("Awaiting edit request", "blue");
 
 // Called when the user clicks on the browser action.
 //    
@@ -51,7 +57,7 @@ chrome.browserAction.onClicked.addListener(function(tab) {
   var tab_port = chrome.tabs.connect(tab.id);
   
   tab_port.postMessage(find_msg);
-  updateUserFeedback("sent request to content script", false);
+  updateUserFeedback("sent request to content script", "green");
 });
 
 // Handle and edit request coming from the content page script
@@ -85,19 +91,19 @@ function handleContentMessages(msg, tab_port)
 		    id: id
 		};
 
-		updateUserFeedback("Last Edit request a success", false);
+		updateUserFeedback("Successful edit of "+msg.title);
 		tab_port.postMessage(update_msg);
 	    } else if (xhr.status == 0) {
 		// Is the edit server actually running?
-		updateUserFeedback("Error: is edit server running?", true);
+		updateUserFeedback("Error: is edit server running?", "red");
 	    } else {
-		updateUserFeedback("Un-handled response: "+xhr.status, true); 
+		updateUserFeedback("Un-handled response: "+xhr.status, "red"); 
 	    }
         }
     }
 
     // reset the display before sending request..
-    updateUserFeedback("Edit request sent", false);
+    updateUserFeedback("Edit request sent for "+msg.title, "green");
 
     xhr.setRequestHeader("Content-type", "text/plain");
     xhr.setRequestHeader("x-url", tab_port.tab.url);
@@ -132,8 +138,8 @@ function handleTestMessages(msg, tab_port)
 // Handle config request messages, the textarea.js content script being in it's own
 // isolated sandbox has to be fed all this via the IPC mechanisms
 
-function getBooleanConfig(config) {
-    return typeof localStorage[config] == "undefined" ? false : localStorage[config] == "true";
+function getBooleanConfig(config, defaultval) {
+    return typeof localStorage[config] == "undefined" ? defaultval : localStorage[config] == "true";
 }
 
 
@@ -141,8 +147,9 @@ function handleConfigMessages(msg, tab_port)
 {
     var config_msg = {
 	msg: "config",
-	enable_dblclick: getBooleanConfig("enable_dblclick"),
-	enable_keys: getBooleanConfig("enable_keys")
+	enable_button: getBooleanConfig("enable_button", true),
+	enable_dblclick: getBooleanConfig("enable_dblclick", false),
+	enable_keys: getBooleanConfig("enable_keys", false)
     };
     tab_port.postMessage(config_msg);
 }
@@ -165,7 +172,13 @@ function localMessageHandler(port)
 	} else if (msg.msg == "test") {
 	    handleTestMessages(msg, port);
 	} else if (msg.msg == "error") {
-	    updateUserFeedback(msg.text, true);
+	    updateUserFeedback(msg.text, "red");
+	} else if (msg.msg == "focus") {
+	    if (msg.id === null) {
+		updateUserFeedback("Awaiting edit request: no focus", "darkblue");
+	    } else {
+		updateUserFeedback("Awaiting edit request: in focus");
+	    }
 	}
     });
 }
