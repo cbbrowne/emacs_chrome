@@ -9,6 +9,9 @@
 	       :url "git@github.com:cbbrowne/emacs_chrome.git")
 	el-get-sources))
 
+;; need little bit of magic to add the appropriate directory to load-path
+;;  - hopefully this will become an el-get option
+
 ;;; Now, load and run
 (require 'edit-server)
 (setq edit-server-new-frame nil)
