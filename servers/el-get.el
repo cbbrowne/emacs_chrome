@@ -6,13 +6,13 @@
       (append 
 	'(:name emacschrome
 	       :type git
-	       :url "git@github.com:cbbrowne/emacs_chrome.git")
+	       :url "git@github.com:cbbrowne/emacs_chrome.git"
+	       :load-path "servers")
 	el-get-sources))
 
-;; need little bit of magic to add the appropriate directory to load-path
-;;  - hopefully this will become an el-get option
+;; You need now run (el-get) which pulls *all* modules including the
+;; above, notably including pulling the Git repo.
 
-;;; Now, load and run
 (require 'edit-server)
 (setq edit-server-new-frame nil)
 (edit-server-start)
